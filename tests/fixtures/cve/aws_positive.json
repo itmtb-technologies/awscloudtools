@@ -1,0 +1,401 @@
+{
+ "about": "Positive scenario. Hand-built in the documented AWS response shapes (botocore service models); NOT captured from a live account.",
+ "inspector2:BatchGetAccountStatus": {
+  "accounts": [
+   {
+    "accountId": "123456789012",
+    "resourceState": {
+     "ec2": {
+      "status": "ENABLED"
+     },
+     "ecr": {
+      "status": "ENABLED"
+     },
+     "lambda": {
+      "status": "DISABLED"
+     },
+     "lambdaCode": {
+      "status": "DISABLED"
+     }
+    },
+    "state": {
+     "status": "ENABLED"
+    }
+   }
+  ],
+  "failedAccounts": []
+ },
+ "inspector2:ListFindings": [
+  {
+   "findings": [
+    {
+     "awsAccountId": "123456789012",
+     "findingArn": "arn:aws:inspector2:eu-west-1:123456789012:finding/00000000000000000000000000000001",
+     "firstObservedAt": "2026-10-20T00:00:00Z",
+     "fixAvailable": "YES",
+     "inspectorScore": 9.8,
+     "lastObservedAt": "2026-10-26T00:00:00Z",
+     "packageVulnerabilityDetails": {
+      "cvss": [
+       {
+        "baseScore": 9.8,
+        "scoringVector": "CVSS:3.1/AV:N",
+        "source": "NVD",
+        "version": "3.1"
+       }
+      ],
+      "referenceUrls": [],
+      "source": "NVD",
+      "vulnerabilityId": "CVE-2023-38545",
+      "vulnerablePackages": [
+       {
+        "arch": "X86_64",
+        "epoch": 0,
+        "fixedInVersion": "7.58.0-2ubuntu3.25",
+        "name": "curl",
+        "packageManager": "OS",
+        "release": "2ubuntu3.24",
+        "version": "7.58.0"
+       }
+      ]
+     },
+     "resources": [
+      {
+       "details": {},
+       "id": "i-0ubuntu18",
+       "region": "eu-west-1",
+       "type": "AWS_EC2_INSTANCE"
+      }
+     ],
+     "severity": "HIGH",
+     "status": "ACTIVE",
+     "title": "CVE-2023-38545 - curl",
+     "type": "PACKAGE_VULNERABILITY"
+    },
+    {
+     "awsAccountId": "123456789012",
+     "findingArn": "arn:aws:inspector2:eu-west-1:123456789012:finding/00000000000000000000000000000002",
+     "firstObservedAt": "2026-10-20T00:00:00Z",
+     "fixAvailable": "NO",
+     "inspectorScore": 8.1,
+     "lastObservedAt": "2026-10-26T00:00:00Z",
+     "packageVulnerabilityDetails": {
+      "cvss": [
+       {
+        "baseScore": 8.1,
+        "scoringVector": "CVSS:3.1/AV:N",
+        "source": "NVD",
+        "version": "3.1"
+       }
+      ],
+      "referenceUrls": [],
+      "source": "NVD",
+      "vulnerabilityId": "CVE-2024-6387",
+      "vulnerablePackages": [
+       {
+        "arch": "X86_64",
+        "epoch": 0,
+        "fixedInVersion": "NotAvailable",
+        "name": "openssh-server",
+        "packageManager": "OS",
+        "release": "4ubuntu0.7",
+        "version": "1:7.6p1"
+       }
+      ]
+     },
+     "resources": [
+      {
+       "details": {},
+       "id": "i-0ubuntu18",
+       "region": "eu-west-1",
+       "type": "AWS_EC2_INSTANCE"
+      }
+     ],
+     "severity": "CRITICAL",
+     "status": "ACTIVE",
+     "title": "CVE-2024-6387 - openssh-server",
+     "type": "PACKAGE_VULNERABILITY"
+    }
+   ],
+   "nextToken": "f2"
+  },
+  {
+   "findings": [
+    {
+     "awsAccountId": "123456789012",
+     "findingArn": "arn:aws:inspector2:eu-west-1:123456789012:finding/00000000000000000000000000000003",
+     "firstObservedAt": "2026-10-20T00:00:00Z",
+     "fixAvailable": "YES",
+     "inspectorScore": 10.0,
+     "lastObservedAt": "2026-10-26T00:00:00Z",
+     "packageVulnerabilityDetails": {
+      "cvss": [
+       {
+        "baseScore": 10.0,
+        "scoringVector": "CVSS:3.1/AV:N",
+        "source": "NVD",
+        "version": "3.1"
+       }
+      ],
+      "referenceUrls": [],
+      "source": "NVD",
+      "vulnerabilityId": "CVE-2024-3094",
+      "vulnerablePackages": [
+       {
+        "arch": "X86_64",
+        "epoch": 0,
+        "fixedInVersion": "5.6.1+really5.4.5-1",
+        "name": "xz-utils",
+        "packageManager": "OS",
+        "release": "0.2",
+        "version": "5.6.0"
+       }
+      ]
+     },
+     "resources": [
+      {
+       "details": {
+        "awsEcrContainerImage": {
+         "imageHash": "sha256:abababababababababababababababababababababababababababababababab",
+         "imageTags": [
+          "v1.4"
+         ],
+         "platform": "DEBIAN_12",
+         "registry": "123456789012",
+         "repositoryName": "shop/api"
+        }
+       },
+       "id": "arn:aws:ecr:eu-west-1:123456789012:repository/shop/api/sha256:abababababababababababababababababababababababababababababababab",
+       "region": "eu-west-1",
+       "type": "AWS_ECR_CONTAINER_IMAGE"
+      }
+     ],
+     "severity": "CRITICAL",
+     "status": "ACTIVE",
+     "title": "CVE-2024-3094 - xz-utils",
+     "type": "PACKAGE_VULNERABILITY"
+    }
+   ]
+  }
+ ],
+ "ssm:DescribeInstanceInformation": [
+  {
+   "InstanceInformationList": [
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0ubuntu18",
+     "PingStatus": "Online",
+     "PlatformName": "Ubuntu",
+     "PlatformType": "Linux",
+     "PlatformVersion": "18.04",
+     "ResourceType": "EC2Instance"
+    },
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0debian12",
+     "PingStatus": "Online",
+     "PlatformName": "Debian GNU/Linux",
+     "PlatformType": "Linux",
+     "PlatformVersion": "12",
+     "ResourceType": "EC2Instance"
+    },
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0al2023",
+     "PingStatus": "Online",
+     "PlatformName": "Amazon Linux",
+     "PlatformType": "Linux",
+     "PlatformVersion": "2023",
+     "ResourceType": "EC2Instance"
+    }
+   ],
+   "NextToken": "p2"
+  },
+  {
+   "InstanceInformationList": [
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0lost",
+     "PingStatus": "ConnectionLost",
+     "PlatformName": "CentOS Linux",
+     "PlatformType": "Linux",
+     "PlatformVersion": "7",
+     "ResourceType": "EC2Instance"
+    },
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0empty",
+     "PingStatus": "Online",
+     "PlatformName": "Ubuntu",
+     "PlatformType": "Linux",
+     "PlatformVersion": "22.04",
+     "ResourceType": "EC2Instance"
+    },
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0bsd",
+     "PingStatus": "Online",
+     "PlatformName": "FreeBSD",
+     "PlatformType": "Linux",
+     "PlatformVersion": "14.1",
+     "ResourceType": "EC2Instance"
+    },
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0nearly",
+     "PingStatus": "Online",
+     "PlatformName": "Microsoft Windows Server 2016 Datacenter",
+     "PlatformType": "Windows",
+     "PlatformVersion": "10.0.14393",
+     "ResourceType": "EC2Instance"
+    }
+   ]
+  }
+ ],
+ "ssm:DescribeInstancePatchStates": {
+  "InstancePatchStates": [
+   {
+    "BaselineId": "pb-0123456789abcdef0",
+    "CriticalNonCompliantCount": 2,
+    "FailedCount": 0,
+    "InstalledCount": 300,
+    "InstalledPendingRebootCount": 0,
+    "InstanceId": "i-0ubuntu18",
+    "MissingCount": 5,
+    "NotApplicableCount": 10,
+    "Operation": "Scan",
+    "OperationEndTime": "2026-10-26T01:05:00Z",
+    "OperationStartTime": "2026-10-26T01:00:00Z",
+    "PatchGroup": "",
+    "SecurityNonCompliantCount": 3
+   },
+   {
+    "BaselineId": "pb-0123456789abcdef0",
+    "CriticalNonCompliantCount": 0,
+    "FailedCount": 0,
+    "InstalledCount": 300,
+    "InstalledPendingRebootCount": 0,
+    "InstanceId": "i-0debian12",
+    "MissingCount": 0,
+    "NotApplicableCount": 10,
+    "Operation": "Scan",
+    "OperationEndTime": "2026-10-26T01:05:00Z",
+    "OperationStartTime": "2026-10-26T01:00:00Z",
+    "PatchGroup": "",
+    "SecurityNonCompliantCount": 0
+   },
+   {
+    "BaselineId": "pb-0123456789abcdef0",
+    "CriticalNonCompliantCount": 0,
+    "FailedCount": 0,
+    "InstalledCount": 300,
+    "InstalledPendingRebootCount": 0,
+    "InstanceId": "i-0al2023",
+    "MissingCount": 1,
+    "NotApplicableCount": 10,
+    "Operation": "Scan",
+    "OperationEndTime": "2026-10-26T01:05:00Z",
+    "OperationStartTime": "2026-10-26T01:00:00Z",
+    "PatchGroup": "",
+    "SecurityNonCompliantCount": 0
+   }
+  ]
+ },
+ "ssm:ListInventoryEntries": {
+  "i-0al2023": {
+   "Entries": [
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "openssl-libs",
+     "Publisher": "x",
+     "Release": "1.amzn2023.0.12",
+     "Version": "3.0.8"
+    }
+   ],
+   "InstanceId": "i-0al2023",
+   "TypeName": "AWS:Application"
+  },
+  "i-0bsd": {
+   "Entries": [
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "pkg",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "1.21"
+    }
+   ],
+   "InstanceId": "i-0bsd",
+   "TypeName": "AWS:Application"
+  },
+  "i-0debian12": {
+   "Entries": [
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "openssl",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "3.0.11-1~deb12u1"
+    }
+   ],
+   "InstanceId": "i-0debian12",
+   "NextToken": "inv2",
+   "TypeName": "AWS:Application"
+  },
+  "i-0debian12#inv2": {
+   "Entries": [
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "bash",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "5.2.15-2+b2"
+    },
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "xz-utils",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "5.4.1-0.2"
+    },
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "curl",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "7.88.1-10+deb12u5"
+    }
+   ],
+   "InstanceId": "i-0debian12",
+   "TypeName": "AWS:Application"
+  },
+  "i-0empty": {
+   "Entries": [],
+   "InstanceId": "i-0empty",
+   "TypeName": "AWS:Application"
+  },
+  "i-0nearly": {
+   "error": "AccessDeniedException"
+  },
+  "i-0ubuntu18": {
+   "Entries": [
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "curl",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "7.58.0-2ubuntu3.24"
+    }
+   ],
+   "InstanceId": "i-0ubuntu18",
+   "TypeName": "AWS:Application"
+  }
+ }
+}

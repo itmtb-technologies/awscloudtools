@@ -1,0 +1,401 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  cloudtools scanner lab. Known misconfigurations, each next to a hardened twin, so a scan
+  can be scored against tests/lab/expected.yaml. SANDBOX ACCOUNTS ONLY. Deploy and remove it
+  with infra/lab/up.sh and infra/lab/down.sh; every resource here is deleted with the stack.
+  Nothing in it holds a working secret: the fake keys are random strings passed in at deploy
+  time, and the one real access key is unusable (its only permission requires a source IP in
+  TEST-NET-1, 192.0.2.0/24, which is not routable).
+
+Parameters:
+  ExternalAccountId:
+    Type: String
+    AllowedPattern: "^[0-9]{12}$"
+    Description: Another account of yours, trusted by two roles that have no permissions.
+  FakeOpenAiKey:
+    Type: String
+    NoEcho: true
+    Description: A random string in OpenAI key format (up.sh makes one). Not a real key.
+  FakeGithubToken:
+    Type: String
+    NoEcho: true
+    Description: A random string in GitHub PAT format (up.sh makes one). Not a real token.
+  ConsolePassword:
+    Type: String
+    NoEcho: true
+    MinLength: 20
+    Description: Random console password for the no-MFA user (up.sh makes one, never shown).
+  OldUbuntuAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/20.04/stable/current/arm64/hvm/ebs-gp2/ami-id
+  CurrentUbuntuAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id
+
+Resources:
+  # --- network: a public subnet (route to the internet) and a private one (none) ---
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties: {CidrBlock: 10.77.0.0/16, EnableDnsSupport: true, EnableDnsHostnames: true}
+  Igw:
+    Type: AWS::EC2::InternetGateway
+  IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {VpcId: !Ref Vpc, InternetGatewayId: !Ref Igw}
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.77.1.0/24, AvailabilityZone: !Select [0, !GetAZs ""]}
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties: {VpcId: !Ref Vpc, CidrBlock: 10.77.2.0/24, AvailabilityZone: !Select [0, !GetAZs ""]}
+  PublicRt:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IgwAttach
+    Properties: {RouteTableId: !Ref PublicRt, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref Igw}
+  PublicRtAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {RouteTableId: !Ref PublicRt, SubnetId: !Ref PublicSubnet}
+  PrivateRt:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref Vpc}
+  PrivateRtAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {RouteTableId: !Ref PrivateRt, SubnetId: !Ref PrivateSubnet}
+
+  BadSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${AWS::StackName}-open"
+      GroupDescription: "lab: SSH and RDP open to the internet"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 3389, ToPort: 3389, CidrIp: 0.0.0.0/0}
+  GoodSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub "${AWS::StackName}-closed"
+      GroupDescription: "lab twin: SSH from inside the VPC only"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: 10.77.0.0/16}
+  EndpointSg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "lab: HTTPS from the VPC to the SSM endpoints"
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 10.77.0.0/16}
+
+  # The private twin has no internet route, so it reaches SSM through endpoints.
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Interface
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+      SubnetIds: [!Ref PrivateSubnet]
+      SecurityGroupIds: [!Ref EndpointSg]
+      PrivateDnsEnabled: true
+  SsmMessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Interface
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssmmessages"
+      SubnetIds: [!Ref PrivateSubnet]
+      SecurityGroupIds: [!Ref EndpointSg]
+      PrivateDnsEnabled: true
+  Ec2MessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      VpcEndpointType: Interface
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ec2messages"
+      SubnetIds: [!Ref PrivateSubnet]
+      SecurityGroupIds: [!Ref EndpointSg]
+      PrivateDnsEnabled: true
+
+  # --- identity ---
+  # Can escalate: PassRole + RunInstances (and CreateFunction) on "*". Used by the bad
+  # instance and the bad function.
+  EscalatorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-escalator"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: [ec2.amazonaws.com, lambda.amazonaws.com]}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+      Policies:
+        - PolicyName: escalate
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [iam:PassRole, ec2:RunInstances, lambda:CreateFunction]
+                Resource: "*"
+  EscalatorProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: {Roles: [!Ref EscalatorRole]}
+  GoodInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-instance-min"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: {Service: ec2.amazonaws.com}, Action: sts:AssumeRole}
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  GoodInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: {Roles: [!Ref GoodInstanceRole]}
+  GoodFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-function-min"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: {Service: lambda.amazonaws.com}, Action: sts:AssumeRole}
+      ManagedPolicyArns:
+        - !Sub "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  ExtTrustRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-ext-trust"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: !Sub "arn:${AWS::Partition}:iam::${ExternalAccountId}:root"}
+            Action: sts:AssumeRole
+  ExtTrustOkRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-ext-trust-ok"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: !Sub "arn:${AWS::Partition}:iam::${ExternalAccountId}:root"}
+            Action: sts:AssumeRole
+            Condition: {StringEquals: {"sts:ExternalId": "scanner-lab"}}
+
+  NoMfaUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub "${AWS::StackName}-nomfa"
+      LoginProfile: {Password: !Ref ConsolePassword, PasswordResetRequired: true}
+  NoConsoleUser:
+    Type: AWS::IAM::User
+    Properties: {UserName: !Sub "${AWS::StackName}-noconsole"}
+  # Its key id is planted in the bad function's environment (tier 1: sec.leaked-aws-key).
+  # Statically admin, in practice unusable: every action needs a TEST-NET-1 source IP.
+  LeakedKeyUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub "${AWS::StackName}-leaked-key"
+      Policies:
+        - PolicyName: admin-from-nowhere
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+                Condition: {IpAddress: {"aws:SourceIp": 192.0.2.1/32}}
+  LeakedKey:
+    Type: AWS::IAM::AccessKey
+    Properties: {UserName: !Ref LeakedKeyUser}
+
+  # --- servers ---
+  BadLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        MetadataOptions: {HttpTokens: optional, HttpEndpoint: enabled}
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            # lab: a fake token in user data (tier 1: sec.config-secrets)
+            export GITHUB_TOKEN=${FakeGithubToken}
+  GoodLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        MetadataOptions: {HttpTokens: required, HttpEndpoint: enabled}
+  # Ubuntu 20.04 (end of standard support 2025-05-31), IMDSv1, public IP, open SG,
+  # escalating role. SSM-managed, so tier 2 can see its packages.
+  BadInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: PublicRoute
+    Properties:
+      ImageId: !Ref OldUbuntuAmi
+      InstanceType: t4g.micro
+      IamInstanceProfile: !Ref EscalatorProfile
+      LaunchTemplate: {LaunchTemplateId: !Ref BadLaunchTemplate, Version: !GetAtt BadLaunchTemplate.LatestVersionNumber}
+      BlockDeviceMappings:
+        - {DeviceName: /dev/sda1, Ebs: {VolumeSize: 8, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true}}
+      NetworkInterfaces:
+        - {DeviceIndex: "0", SubnetId: !Ref PublicSubnet, GroupSet: [!Ref BadSg], AssociatePublicIpAddress: true}
+      Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-bad"}]
+  # Ubuntu 24.04, IMDSv2, private subnet, no public IP, minimal role.
+  GoodInstance:
+    Type: AWS::EC2::Instance
+    DependsOn: [SsmEndpoint, SsmMessagesEndpoint, Ec2MessagesEndpoint]
+    Properties:
+      ImageId: !Ref CurrentUbuntuAmi
+      InstanceType: t4g.micro
+      IamInstanceProfile: !Ref GoodInstanceProfile
+      LaunchTemplate: {LaunchTemplateId: !Ref GoodLaunchTemplate, Version: !GetAtt GoodLaunchTemplate.LatestVersionNumber}
+      BlockDeviceMappings:
+        - {DeviceName: /dev/sda1, Ebs: {VolumeSize: 8, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true}}
+      NetworkInterfaces:
+        - {DeviceIndex: "0", SubnetId: !Ref PrivateSubnet, GroupSet: [!Ref GoodSg], AssociatePublicIpAddress: false}
+      Tags: [{Key: Name, Value: !Sub "${AWS::StackName}-good"}]
+
+  InventoryAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      Name: AWS-GatherSoftwareInventory
+      Targets: [{Key: InstanceIds, Values: [!Ref BadInstance, !Ref GoodInstance]}]
+  PatchScanAssociation:
+    Type: AWS::SSM::Association
+    Properties:
+      Name: AWS-RunPatchBaseline
+      Parameters: {Operation: [Scan]}
+      Targets: [{Key: InstanceIds, Values: [!Ref BadInstance, !Ref GoodInstance]}]
+
+  # --- data ---
+  BadVolume:
+    Type: AWS::EC2::Volume
+    Properties: {AvailabilityZone: !Select [0, !GetAZs ""], Size: 1, VolumeType: gp3, Encrypted: false}
+  GoodVolume:
+    Type: AWS::EC2::Volume
+    Properties: {AvailabilityZone: !Select [0, !GetAZs ""], Size: 1, VolumeType: gp3, Encrypted: true}
+
+  PublicBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-public-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        {BlockPublicAcls: false, BlockPublicPolicy: false, IgnorePublicAcls: false, RestrictPublicBuckets: false}
+  PublicBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PublicBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: "*", Action: s3:GetObject, Resource: !Sub "${PublicBucket.Arn}/*"}
+  PrivateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-private-${AWS::AccountId}-${AWS::Region}"
+      PublicAccessBlockConfiguration:
+        {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+
+  OpenQueue:
+    Type: AWS::SQS::Queue
+    Properties: {QueueName: !Sub "${AWS::StackName}-open-q"}
+  OpenQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref OpenQueue]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - {Effect: Allow, Principal: "*", Action: sqs:SendMessage, Resource: !GetAtt OpenQueue.Arn}
+  ScopedQueue:
+    Type: AWS::SQS::Queue
+    Properties: {QueueName: !Sub "${AWS::StackName}-scoped-q"}
+  ScopedQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues: [!Ref ScopedQueue]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: sqs:SendMessage
+            Resource: !GetAtt ScopedQueue.Arn
+            Condition: {ArnEquals: {"aws:SourceArn": !Sub "arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:none"}}
+
+  # --- functions ---
+  # Public URL (auth NONE), escalating role, a fake OpenAI key and the leaked key id in its
+  # environment. Its code only returns "lab".
+  BadFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-open-fn"
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt EscalatorRole.Arn
+      Code: {ZipFile: "def handler(event, context):\n    return {'statusCode': 200, 'body': 'lab'}\n"}
+      Environment:
+        Variables: {OPENAI_API_KEY: !Ref FakeOpenAiKey, LAB_KEY_ID: !Ref LeakedKey}
+  BadFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties: {TargetFunctionArn: !Ref BadFunction, AuthType: NONE}
+  BadFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BadFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+  BadFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: {LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-open-fn", RetentionInDays: 1}
+  GoodFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-iam-fn"
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt GoodFunctionRole.Arn
+      Code: {ZipFile: "def handler(event, context):\n    return {'statusCode': 200, 'body': 'lab'}\n"}
+  GoodFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties: {TargetFunctionArn: !Ref GoodFunction, AuthType: AWS_IAM}
+  GoodFunctionLogs:
+    Type: AWS::Logs::LogGroup
+    Properties: {LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-iam-fn", RetentionInDays: 1}
+
+# Each output is a name tests/lab/expected.yaml refers to. The scorer matches a finding to
+# a lab resource when the finding's resource id or name equals the value (or an ARN ends in it).
+Outputs:
+  Vpc: {Value: !Ref Vpc}
+  BadSg: {Value: !Ref BadSg}
+  GoodSg: {Value: !Ref GoodSg}
+  EndpointSg: {Value: !Ref EndpointSg}
+  BadInstance: {Value: !Ref BadInstance}
+  GoodInstance: {Value: !Ref GoodInstance}
+  BadVolume: {Value: !Ref BadVolume}
+  GoodVolume: {Value: !Ref GoodVolume}
+  PublicBucket: {Value: !Ref PublicBucket}
+  PrivateBucket: {Value: !Ref PrivateBucket}
+  OpenQueue: {Value: !GetAtt OpenQueue.Arn}
+  ScopedQueue: {Value: !GetAtt ScopedQueue.Arn}
+  BadFunction: {Value: !Ref BadFunction}
+  GoodFunction: {Value: !Ref GoodFunction}
+  EscalatorRole: {Value: !Ref EscalatorRole}
+  GoodInstanceRole: {Value: !Ref GoodInstanceRole}
+  GoodFunctionRole: {Value: !Ref GoodFunctionRole}
+  ExtTrustRole: {Value: !Ref ExtTrustRole}
+  ExtTrustOkRole: {Value: !Ref ExtTrustOkRole}
+  NoMfaUser: {Value: !Ref NoMfaUser}
+  NoConsoleUser: {Value: !Ref NoConsoleUser}
+  LeakedKeyUser: {Value: !Ref LeakedKeyUser}

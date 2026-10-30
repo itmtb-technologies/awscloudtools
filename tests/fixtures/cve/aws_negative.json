@@ -1,0 +1,83 @@
+{
+ "about": "Negative scenario: one supported, fully patched, inventoried Debian 12 host; Inspector off.",
+ "inspector2:BatchGetAccountStatus": {
+  "accounts": [
+   {
+    "accountId": "123456789012",
+    "resourceState": {
+     "ec2": {
+      "status": "DISABLED"
+     },
+     "ecr": {
+      "status": "DISABLED"
+     },
+     "lambda": {
+      "status": "DISABLED"
+     }
+    },
+    "state": {
+     "status": "DISABLED"
+    }
+   }
+  ],
+  "failedAccounts": []
+ },
+ "ssm:DescribeInstanceInformation": [
+  {
+   "InstanceInformationList": [
+    {
+     "AgentVersion": "3.3.0.0",
+     "InstanceId": "i-0debian12",
+     "PingStatus": "Online",
+     "PlatformName": "Debian GNU/Linux",
+     "PlatformType": "Linux",
+     "PlatformVersion": "12",
+     "ResourceType": "EC2Instance"
+    }
+   ]
+  }
+ ],
+ "ssm:DescribeInstancePatchStates": {
+  "InstancePatchStates": [
+   {
+    "BaselineId": "pb-0123456789abcdef0",
+    "CriticalNonCompliantCount": 0,
+    "FailedCount": 0,
+    "InstalledCount": 300,
+    "InstalledPendingRebootCount": 0,
+    "InstanceId": "i-0debian12",
+    "MissingCount": 0,
+    "NotApplicableCount": 10,
+    "Operation": "Scan",
+    "OperationEndTime": "2026-10-26T01:05:00Z",
+    "OperationStartTime": "2026-10-26T01:00:00Z",
+    "PatchGroup": "",
+    "SecurityNonCompliantCount": 0
+   }
+  ]
+ },
+ "ssm:ListInventoryEntries": {
+  "i-0debian12": {
+   "Entries": [
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "openssl",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "3.0.11-1~deb12u2"
+    },
+    {
+     "ApplicationType": "System Environment/Base",
+     "Architecture": "x86_64",
+     "Name": "bash",
+     "Publisher": "x",
+     "Release": "",
+     "Version": "5.2.15-2+b2"
+    }
+   ],
+   "InstanceId": "i-0debian12",
+   "TypeName": "AWS:Application"
+  }
+ }
+}

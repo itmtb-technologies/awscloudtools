@@ -1,0 +1,42 @@
+# Ground truth for infra/lab/scanner-lab.yaml, scored by tools/lab_score.py.
+#
+# Resources are named by the stack's output keys. A finding belongs to the lab when its
+# resource id or name equals an output value (or an ARN ends in it).
+#
+# required   each must be found (recall). `tier` is the lowest scan tier that can see it;
+#            an entry above the report's max_tier is skipped, not missed. `unless` names an
+#            account setting (recorded by up.sh in lab-context.json) that makes it impossible.
+# twins      hardened resources. ANY finding on one is a false hit (precision), except the
+#            checks listed for it under allowed_on_twins.
+# Findings on other lab resources beyond `required` are listed as "extra" for review, not
+# scored. Account-wide findings (root MFA, GuardDuty, Config, ...) are "outside the lab".
+
+required:
+  - {resource: BadSg, check: net.open-admin-ports}
+  - {resource: BadInstance, check: srv.imdsv1-enabled}
+  - {resource: BadInstance, check: srv.public-ip}
+  - {resource: BadInstance, check: srv.os-end-of-life}       # Ubuntu 20.04, ended 2025-05-31
+  - {resource: BadVolume, check: data.ebs-unencrypted, unless: ebs_encryption_by_default}
+  - {resource: PublicBucket, check: data.s3-public-bucket}
+  - {resource: OpenQueue, check: data.sqs-policy-public}
+  - {resource: BadFunction, check: net.lambda-url-no-auth}
+  - {resource: EscalatorRole, check: iam.privilege-escalation}
+  - {resource: ExtTrustRole, check: iam.trust-without-external-id}
+  - {resource: NoMfaUser, check: iam.user-no-mfa}
+  # tier 1: the fake OpenAI key in the function env, the fake GitHub token in user data,
+  # and the leaked key id (reported on the function or on the key's user).
+  - {resource: BadFunction, check: sec.config-secrets, tier: 1}
+  - {resource: BadInstance, check: sec.config-secrets, tier: 1}
+  - {resource: [BadFunction, LeakedKeyUser], check: sec.leaked-aws-key, tier: 1}
+  # tier 2: needs Inspector on (up.sh --tier2) and the SSM associations to have run.
+  - {resource: BadInstance, check: cve.inspector, tier: 2}
+  - {resource: BadInstance, check: cve.missing-patches, tier: 2}
+  - {resource: BadInstance, check: cve.osv-packages, tier: 2}
+
+twins: [GoodSg, GoodInstance, GoodVolume, PrivateBucket, ScopedQueue, GoodFunction,
+        GoodInstanceRole, GoodFunctionRole, ExtTrustOkRole, NoConsoleUser]
+
+allowed_on_twins:
+  # A current image can still carry CVEs published after it was built, and the private twin
+  # has no internet route for the patch scan's apt update. Neither is a scanner error.
+  GoodInstance: [cve.inspector, cve.missing-patches, cve.osv-packages]

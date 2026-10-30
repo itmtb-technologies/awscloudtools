@@ -1,0 +1,122 @@
+{
+ "about": "Graph known answer: the same MEDIUM CVE on the reachable lab host ({bad}) and the unreachable one ({good}).",
+ "inspector2:BatchGetAccountStatus": {
+  "accounts": [
+   {
+    "accountId": "123456789012",
+    "resourceState": {
+     "ec2": {
+      "status": "ENABLED"
+     },
+     "ecr": {
+      "status": "ENABLED"
+     },
+     "lambda": {
+      "status": "DISABLED"
+     },
+     "lambdaCode": {
+      "status": "DISABLED"
+     }
+    },
+    "state": {
+     "status": "ENABLED"
+    }
+   }
+  ],
+  "failedAccounts": []
+ },
+ "inspector2:ListFindings": [
+  {
+   "findings": [
+    {
+     "awsAccountId": "123456789012",
+     "findingArn": "arn:aws:inspector2:eu-west-1:123456789012:finding/0000000000000000000000000000000a",
+     "firstObservedAt": "2026-10-20T00:00:00Z",
+     "fixAvailable": "YES",
+     "inspectorScore": 5.9,
+     "lastObservedAt": "2026-10-26T00:00:00Z",
+     "packageVulnerabilityDetails": {
+      "cvss": [
+       {
+        "baseScore": 5.9,
+        "scoringVector": "CVSS:3.1/AV:N",
+        "source": "NVD",
+        "version": "3.1"
+       }
+      ],
+      "referenceUrls": [],
+      "source": "NVD",
+      "vulnerabilityId": "CVE-2024-6387",
+      "vulnerablePackages": [
+       {
+        "arch": "X86_64",
+        "epoch": 0,
+        "fixedInVersion": "8.9p1-3ubuntu0.10",
+        "name": "openssh-server",
+        "packageManager": "OS",
+        "release": "3ubuntu0.6",
+        "version": "8.9p1"
+       }
+      ]
+     },
+     "resources": [
+      {
+       "details": {},
+       "id": "{bad}",
+       "region": "eu-west-1",
+       "type": "AWS_EC2_INSTANCE"
+      }
+     ],
+     "severity": "MEDIUM",
+     "status": "ACTIVE",
+     "title": "CVE-2024-6387 - openssh-server",
+     "type": "PACKAGE_VULNERABILITY"
+    },
+    {
+     "awsAccountId": "123456789012",
+     "findingArn": "arn:aws:inspector2:eu-west-1:123456789012:finding/0000000000000000000000000000000b",
+     "firstObservedAt": "2026-10-20T00:00:00Z",
+     "fixAvailable": "YES",
+     "inspectorScore": 5.9,
+     "lastObservedAt": "2026-10-26T00:00:00Z",
+     "packageVulnerabilityDetails": {
+      "cvss": [
+       {
+        "baseScore": 5.9,
+        "scoringVector": "CVSS:3.1/AV:N",
+        "source": "NVD",
+        "version": "3.1"
+       }
+      ],
+      "referenceUrls": [],
+      "source": "NVD",
+      "vulnerabilityId": "CVE-2024-6387",
+      "vulnerablePackages": [
+       {
+        "arch": "X86_64",
+        "epoch": 0,
+        "fixedInVersion": "8.9p1-3ubuntu0.10",
+        "name": "openssh-server",
+        "packageManager": "OS",
+        "release": "3ubuntu0.6",
+        "version": "8.9p1"
+       }
+      ]
+     },
+     "resources": [
+      {
+       "details": {},
+       "id": "{good}",
+       "region": "eu-west-1",
+       "type": "AWS_EC2_INSTANCE"
+      }
+     ],
+     "severity": "MEDIUM",
+     "status": "ACTIVE",
+     "title": "CVE-2024-6387 - openssh-server",
+     "type": "PACKAGE_VULNERABILITY"
+    }
+   ]
+  }
+ ]
+}

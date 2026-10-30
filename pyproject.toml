@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cloudtools"
+version = "0.1.4"
+description = "Read-only AWS security, credential and cost tools; one codebase, standalone or hosted"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+dependencies = [
+  "boto3>=1.34,<2",
+  "networkx>=3.2,<4",
+  "pyyaml>=6,<7",
+  "jsonschema>=4.20,<5",
+]
+
+[project.optional-dependencies]
+serve = ["fastapi>=0.115,<1", "uvicorn>=0.29,<1"]
+dev = ["setuptools>=70.1", "pytest>=8,<10", "moto[all]>=5,<6", "httpx>=0.27,<1"]
+
+[project.scripts]
+cloudtools = "cloudtools.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"cloudtools.security" = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]

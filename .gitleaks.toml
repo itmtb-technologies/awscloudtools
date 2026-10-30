@@ -1,0 +1,8 @@
+# Default gitleaks rules, minus tests/: those hold deliberate fake keys and passwords
+# (canaries that prove the scanner never stores a value).
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "test canaries"
+paths = ['''^tests/''']

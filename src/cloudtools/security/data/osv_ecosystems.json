@@ -1,0 +1,38 @@
+{
+  "about": "SSM PlatformName/PlatformVersion -> OSV ecosystem, read by cve.osv-packages. `platform` is a regex on PlatformName; `version` a regex on PlatformVersion whose first group fills {v}; `download` is the top-level OSV ecosystem zip `cloudtools cve update-db` fetches. Amazon Linux and Windows are deliberately absent: an instance on them gets a gap that points at Inspector.",
+  "base_url": "https://osv-vulnerabilities.storage.googleapis.com",
+  "skip_packages": {
+    "patterns": [
+      "^linux(-|$)",
+      "^kernel(-|$)"
+    ],
+    "why": "Kernel packages: SSM Inventory lists binary names (linux-aws, linux-image-*) and OSV keys kernels by source package (linux, linux-aws-6.8, ...). A binary name equal to an unrelated source name matches that kernel line's unfixed CVEs at any version: in the live lab, 2,466 false hits on one Ubuntu 24.04 host (2026-10-29). Inspector maps kernels correctly; a host Inspector doesn't cover gets a gap."
+  },
+  "entries": [
+    {"platform": "^Ubuntu$",
+      "version": "^(\\d+\\.04)",
+      "ecosystem": "Ubuntu:{v}:LTS",
+      "download": "Ubuntu"
+    },
+    {"platform": "^Debian",
+      "version": "^(\\d+)",
+      "ecosystem": "Debian:{v}",
+      "download": "Debian"
+    },
+    {"platform": "^AlmaLinux",
+      "version": "^(\\d+)",
+      "ecosystem": "AlmaLinux:{v}",
+      "download": "AlmaLinux"
+    },
+    {"platform": "^Rocky",
+      "version": "^(\\d+)",
+      "ecosystem": "Rocky Linux:{v}",
+      "download": "Rocky Linux"
+    },
+    {"platform": "^Alpine",
+      "version": "^(\\d+\\.\\d+)",
+      "ecosystem": "Alpine:v{v}",
+      "download": "Alpine"
+    }
+  ]
+}

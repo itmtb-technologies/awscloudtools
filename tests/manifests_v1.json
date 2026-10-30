@@ -1,0 +1,454 @@
+{
+ "cred.accounts": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "cred.accounts",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    },
+    "source": {
+     "maxLength": 32,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:credentials:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "cred.inventory": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "cred.inventory",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "leaked_only": {
+     "type": "boolean"
+    },
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:credentials:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.chokepoints": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.chokepoints",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    },
+    "top": {
+     "maximum": 25,
+     "minimum": 1,
+     "type": "integer"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.doctor": {
+  "agent_visible": true,
+  "hosted": false,
+  "id": "security.doctor",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "profile": {
+     "maxLength": 16,
+     "type": "string"
+    },
+    "regions": {
+     "maxLength": 512,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "job",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.evaluate": {
+  "agent_visible": false,
+  "hosted": false,
+  "id": "security.evaluate",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "profile": {
+     "maxLength": 16,
+     "type": "string"
+    },
+    "snapshot": {
+     "maxLength": 1024,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "job",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.explain_finding": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.explain_finding",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "finding_id": {
+     "maxLength": 64,
+     "type": "string"
+    },
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.find_paths": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.find_paths",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "entry": {
+     "maxLength": 512,
+     "type": "string"
+    },
+    "page": {
+     "maximum": 1000,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "page_size": {
+     "maximum": 50,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    },
+    "target": {
+     "maxLength": 512,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.generate_policy": {
+  "agent_visible": true,
+  "hosted": false,
+  "id": "security.generate_policy",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "profile": {
+     "maxLength": 16,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.get_run_status": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.get_run_status",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.list_checks": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.list_checks",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "category": {
+     "maxLength": 32,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.list_findings": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.list_findings",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "check_prefix": {
+     "maxLength": 64,
+     "type": "string"
+    },
+    "diff": {
+     "maxLength": 16,
+     "type": "string"
+    },
+    "min_severity": {
+     "maxLength": 8,
+     "type": "string"
+    },
+    "page": {
+     "maximum": 1000,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "page_size": {
+     "maximum": 100,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "region": {
+     "maxLength": 32,
+     "type": "string"
+    },
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.list_paths": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.list_paths",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "page": {
+     "maximum": 1000,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "page_size": {
+     "maximum": 50,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    },
+    "target": {
+     "maxLength": 256,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.run_check": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.run_check",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "check_id": {
+     "maxLength": 64,
+     "type": "string"
+    },
+    "regions": {
+     "maxLength": 512,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "job",
+  "mutating": false,
+  "permission": "security:scan",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.scan": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.scan",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "profile": {
+     "maxLength": 16,
+     "type": "string"
+    },
+    "regions": {
+     "maxLength": 512,
+     "type": "string"
+    },
+    "tier": {
+     "maximum": 2,
+     "minimum": 0,
+     "type": "integer"
+    },
+    "wait": {
+     "type": "boolean"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "job",
+  "mutating": false,
+  "permission": "security:scan",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.what_if": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.what_if",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "finding_ids": {
+     "maxLength": 512,
+     "type": "string"
+    },
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ },
+ "security.why_reachable": {
+  "agent_visible": true,
+  "hosted": true,
+  "id": "security.why_reachable",
+  "input_schema": {
+   "additionalProperties": false,
+   "properties": {
+    "page": {
+     "maximum": 1000,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "page_size": {
+     "maximum": 50,
+     "minimum": 1,
+     "type": "integer"
+    },
+    "resource": {
+     "maxLength": 512,
+     "type": "string"
+    },
+    "run_id": {
+     "maxLength": 64,
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
+  "kind": "view",
+  "mutating": false,
+  "permission": "security:read",
+  "read_only": true,
+  "requires_approval": false,
+  "tier": 0
+ }
+}

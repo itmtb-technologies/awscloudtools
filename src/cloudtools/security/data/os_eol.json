@@ -1,0 +1,29 @@
+{
+  "about": "End of standard/vendor security support per OS release, read by srv.os-end-of-life. One entry per release; `platform` is a regex on SSM PlatformName, `version` a prefix of PlatformVersion (\"\" = any). Dates are from vendor lifecycle pages, recorded 2026-10-27 from prior knowledge and NOT re-fetched that day: check `source` before relying on one.",
+  "checked": "2026-10-27 (unverified against the live pages)",
+  "entries": [
+    {"platform": "^Amazon Linux AMI$", "version": "", "eol": "2023-12-31", "release": "Amazon Linux AMI (2018.03)", "source": "https://aws.amazon.com/amazon-linux-ami/faqs/"},
+    {"platform": "^Amazon Linux$", "version": "2", "eol": "2026-06-30", "release": "Amazon Linux 2", "source": "https://aws.amazon.com/amazon-linux-2/faqs/"},
+    {"platform": "^Amazon Linux$", "version": "2023", "eol": "2029-06-30", "release": "Amazon Linux 2023", "source": "https://docs.aws.amazon.com/linux/al2023/ug/release-cadence.html"},
+    {"platform": "^Ubuntu$", "version": "14.04", "eol": "2019-04-30", "release": "Ubuntu 14.04 LTS (standard support)", "source": "https://ubuntu.com/about/release-cycle"},
+    {"platform": "^Ubuntu$", "version": "16.04", "eol": "2021-04-30", "release": "Ubuntu 16.04 LTS (standard support)", "source": "https://ubuntu.com/about/release-cycle"},
+    {"platform": "^Ubuntu$", "version": "18.04", "eol": "2023-05-31", "release": "Ubuntu 18.04 LTS (standard support)", "source": "https://ubuntu.com/about/release-cycle"},
+    {"platform": "^Ubuntu$", "version": "20.04", "eol": "2025-05-31", "release": "Ubuntu 20.04 LTS (standard support)", "source": "https://ubuntu.com/about/release-cycle"},
+    {"platform": "^Ubuntu$", "version": "22.04", "eol": "2027-05-31", "release": "Ubuntu 22.04 LTS (standard support)", "source": "https://ubuntu.com/about/release-cycle"},
+    {"platform": "^Ubuntu$", "version": "24.04", "eol": "2029-05-31", "release": "Ubuntu 24.04 LTS (standard support)", "source": "https://ubuntu.com/about/release-cycle"},
+    {"platform": "^Debian", "version": "9", "eol": "2022-06-30", "release": "Debian 9 (LTS)", "source": "https://wiki.debian.org/LTS"},
+    {"platform": "^Debian", "version": "10", "eol": "2024-06-30", "release": "Debian 10 (LTS)", "source": "https://wiki.debian.org/LTS"},
+    {"platform": "^Debian", "version": "11", "eol": "2026-08-31", "release": "Debian 11 (LTS)", "source": "https://wiki.debian.org/LTS"},
+    {"platform": "^Debian", "version": "12", "eol": "2028-06-30", "release": "Debian 12 (LTS)", "source": "https://wiki.debian.org/LTS"},
+    {"platform": "^CentOS", "version": "7", "eol": "2024-06-30", "release": "CentOS Linux 7", "source": "https://www.redhat.com/en/topics/linux/centos-linux-eol"},
+    {"platform": "^CentOS", "version": "8", "eol": "2021-12-31", "release": "CentOS Linux 8", "source": "https://www.redhat.com/en/topics/linux/centos-linux-eol"},
+    {"platform": "^Red Hat Enterprise Linux", "version": "6", "eol": "2020-11-30", "release": "RHEL 6 (maintenance support)", "source": "https://access.redhat.com/support/policy/updates/errata"},
+    {"platform": "^Red Hat Enterprise Linux", "version": "7", "eol": "2024-06-30", "release": "RHEL 7 (maintenance support)", "source": "https://access.redhat.com/support/policy/updates/errata"},
+    {"platform": "^Red Hat Enterprise Linux", "version": "8", "eol": "2029-05-31", "release": "RHEL 8 (maintenance support)", "source": "https://access.redhat.com/support/policy/updates/errata"},
+    {"platform": "^Microsoft Windows Server 2008", "version": "", "eol": "2020-01-14", "release": "Windows Server 2008 / 2008 R2", "source": "https://learn.microsoft.com/en-us/lifecycle/products/windows-server-2008-r2"},
+    {"platform": "^Microsoft Windows Server 2012", "version": "", "eol": "2023-10-10", "release": "Windows Server 2012 / 2012 R2", "source": "https://learn.microsoft.com/en-us/lifecycle/products/windows-server-2012-r2"},
+    {"platform": "^Microsoft Windows Server 2016", "version": "", "eol": "2027-01-12", "release": "Windows Server 2016 (extended support)", "source": "https://learn.microsoft.com/en-us/lifecycle/products/windows-server-2016"},
+    {"platform": "^Microsoft Windows Server 2019", "version": "", "eol": "2029-01-09", "release": "Windows Server 2019 (extended support)", "source": "https://learn.microsoft.com/en-us/lifecycle/products/windows-server-2019"},
+    {"platform": "^Microsoft Windows Server 2022", "version": "", "eol": "2031-10-14", "release": "Windows Server 2022 (extended support)", "source": "https://learn.microsoft.com/en-us/lifecycle/products/windows-server-2022"}
+  ]
+}

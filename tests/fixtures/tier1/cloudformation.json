@@ -1,0 +1,9 @@
+{"describe_stacks": {"Stacks": [{
+   "StackName": "billing", "StackStatus": "CREATE_COMPLETE",
+   "CreationTime": "2026-10-01T00:00:00Z",
+   "StackId": "arn:aws:cloudformation:eu-west-1:123456789012:stack/billing/0f1e2d3c",
+   "Parameters": [{"ParameterKey": "Env", "ParameterValue": "prod"},
+                  {"ParameterKey": "DbPassword", "ParameterValue": "****"},
+                  {"ParameterKey": "ApiToken", "ParameterValue": "{{PASSWORD:cfnparam}}"}]}]},
+ "get_template": {"TemplateBody": "AWSTemplateFormatVersion: '2010-09-09'\nParameters:\n  Env:\n    Type: String\nResources:\n  Fn:\n    Type: AWS::Lambda::Function\n    Properties:\n      Environment:\n        Variables:\n          GITHUB_TOKEN: {{CANARY:cfn}}\n          DB_SECRET: !Ref DbSecret\n", "StagesAvailable": ["Original", "Processed"]},
+ "get_template_clean": {"TemplateBody": "AWSTemplateFormatVersion: '2010-09-09'\nResources:\n  Topic:\n    Type: AWS::SNS::Topic\n    Properties:\n      TopicName: '{{resolve:ssm:/topic/name}}'\n", "StagesAvailable": ["Original"]}}
