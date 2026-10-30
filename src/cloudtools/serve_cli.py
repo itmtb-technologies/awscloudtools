@@ -17,6 +17,7 @@ import json
 import os
 import secrets
 import sys
+from datetime import datetime, timezone
 
 HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -40,23 +41,49 @@ def _args(p: argparse.ArgumentParser) -> None:
 class LocalOnly:
     """ASGI guard in front of the app: this server's Host, and this launch's token."""
 
-    def __init__(self, app, token: str, port: int):
+    def __init__(self, app, token: str, port: int, sinks=()):
         self.app = app
         self.auth = f"Bearer {token}".encode()
         self.hosts = {f"{HOST}:{port}".encode(), f"localhost:{port}".encode()}
+        self.sinks = list(sinks)
+
+    def _record(self, scope, status: int, outcome: str) -> None:
+        """One line per request (CT-10): method, path, status, outcome. Never the query
+        string or a header, so neither ids nor the token reach the log."""
+        event = {"ts": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+                 "event": "http.request", "method": scope.get("method"),
+                 "path": scope.get("path"), "status": status, "outcome": outcome}
+        for sink in self.sinks:
+            try:
+                sink(event)
+            except Exception:                    # an audit line must never fail a request
+                pass
 
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http":
-            headers = dict(scope.get("headers") or [])
-            if headers.get(b"host", b"").lower() not in self.hosts:
-                return await _deny(send, 403, "FORBIDDEN", "this server answers only "
-                                   f"http://{HOST} and http://localhost on its own port")
-            if scope["path"] != "/health" and not hmac.compare_digest(
-                    headers.get(b"authorization", b""), self.auth):
-                return await _deny(send, 401, "UNAUTHENTICATED",
-                                   "send the token cloudtools serve printed: "
-                                   "Authorization: Bearer <token>")
-        await self.app(scope, receive, send)
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        headers = dict(scope.get("headers") or [])
+        if headers.get(b"host", b"").lower() not in self.hosts:
+            self._record(scope, 403, "foreign_host")
+            return await _deny(send, 403, "FORBIDDEN", "this server answers only "
+                               f"http://{HOST} and http://localhost on its own port")
+        if scope["path"] != "/health" and not hmac.compare_digest(
+                headers.get(b"authorization", b""), self.auth):
+            self._record(scope, 401, "no_token")
+            return await _deny(send, 401, "UNAUTHENTICATED",
+                               "send the token cloudtools serve printed: "
+                               "Authorization: Bearer <token>")
+        seen = {}
+
+        async def watch(message):
+            if message["type"] == "http.response.start":
+                seen["status"] = message["status"]
+            await send(message)
+        try:
+            await self.app(scope, receive, watch)
+        finally:
+            st = seen.get("status", 500)
+            self._record(scope, st, "ok" if st < 400 else "error")
 
 
 async def _deny(send, status: int, code: str, detail: str) -> None:
@@ -71,7 +98,14 @@ def build_app(a, token: str):
     from .http_app import create_app
     plat = StandalonePlatform(profile=a.aws_profile, region=a.region, output=a.out,
                               initiator="http", log_to_stderr=a.verbose)
-    return LocalOnly(create_app(lambda _request: plat), token, a.port)
+    sinks: list = []
+
+    def audit(event):                    # the log folder is made on the first request
+        if not sinks:
+            sinks.extend(plat.log_sinks("http"))
+        for sink in sinks:
+            sink(event)
+    return LocalOnly(create_app(lambda _request: plat), token, a.port, [audit])
 
 
 def cmd_serve(a) -> int:

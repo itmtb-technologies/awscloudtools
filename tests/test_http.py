@@ -207,7 +207,7 @@ def test_serve_needs_this_launchs_token(tmp_path, auth):
     r = client.post("/v1/security/scan", content='{"profile": "quick"}',
                     headers={**headers, "Content-Type": "text/plain"})
     assert r.status_code == 401 and r.json()["error_code"] == "UNAUTHENTICATED"
-    assert not (tmp_path / "runs").exists(), "nothing may start without the token"
+    assert not list(tmp_path.glob("runs/r-*")), "nothing may start without the token"
 
 
 @pytest.mark.parametrize("host", ["127.0.0.1:8765", "localhost:8765"])
@@ -226,3 +226,20 @@ def test_hosted_scan_takes_only_a_built_in_profile(tmp_path):
     r = client.post("/v1/security/scan", json={"profile": "/etc/hosts"})
     assert r.status_code == 400 and r.json()["error_code"] == "VALIDATION"
     assert not (tmp_path / "runs").exists()
+
+
+def test_serve_records_every_request_without_the_token(tmp_path):
+    """CT-10: serve logged only errors; who called which route, and what was refused,
+    went unrecorded."""
+    client, token = _served(tmp_path)
+    client.get("/v1/security/list_checks", headers={"Host": "attacker.example:8765"})
+    client.get("/v1/security/list_checks?run_id=x", headers={"Host": "127.0.0.1:8765"})
+    client.get("/v1/security/list_checks", headers={"Host": "127.0.0.1:8765",
+                                                    "Authorization": f"Bearer {token}"})
+    log = (tmp_path / "runs" / "http" / "run.jsonl").read_text(encoding="utf-8")
+    events = [json.loads(x) for x in log.splitlines()]
+    reqs = [e for e in events if e["event"] == "http.request"]
+    assert [(e["status"], e["outcome"]) for e in reqs] == [
+        (403, "foreign_host"), (401, "no_token"), (200, "ok")]
+    assert all(e["path"] == "/v1/security/list_checks" and e["method"] == "GET" for e in reqs)
+    assert token not in log and "run_id=x" not in log

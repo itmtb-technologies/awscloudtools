@@ -107,6 +107,18 @@ def repo_secrets(ctx) -> CheckResult:
         return res
     res.gaps += [Gap("cred.repo-secrets", f"repo {e['path']}", e["why"]) for e in repos["errors"]]
     for repo in repos["repos"]:
+        sup = repo.get("suppressions") or {}
+        if sup.get("files") or sup.get("inline_allows"):
+            # Never obeyed (CT-14): a repo must not decide what its own scan reports.
+            what = sup.get("files", []) + ([f"{sup['inline_allows']} gitleaks:allow comment(s)"]
+                                            if sup.get("inline_allows") else [])
+            res.findings.append(ctx.finding(
+                {"id": f"repo:{repo['path']}", "name": repo["repo"], "type": "repository"},
+                f"{repo['repo']} tries to suppress secret scanning ({', '.join(what)})",
+                [("gitleaks", repo["repo"], ", ".join(what))],
+                {"summary": "These were ignored, so anything they hid is reported here. Check "
+                            "nothing real is being hidden, and why the suppression exists."},
+                severity="info", qualifiers={"aspect": "suppressions"}))
         found = [s for s in repo["secrets"] if s["kind"] != "aws_access_key_id"]
         if not found:
             continue

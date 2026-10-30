@@ -29,14 +29,8 @@ def cloudtrail(ctx) -> CheckResult:
               f"{len(trails)} trail(s), none multi-region and logging")],
             {"summary": "Create a multi-region trail (or an organization trail) with log file "
                         "validation, delivering to a locked-down bucket."}))
-    for t in good:
-        if not t["validation"]:
-            res.findings.append(ctx.finding(
-                {"id": t["arn"], "name": t["name"], "region": t["home"], "type": "cloudtrail_trail"},
-                f"Trail {t['name']} has log file validation off",
-                [("cloudtrail:DescribeTrails", t["arn"], "LogFileValidationEnabled=false")],
-                {"summary": "Enable log file validation."}, severity="low",
-                qualifiers={"aspect": "validation"}))
+    # Validation is log.cloudtrail-integrity's to report, for every trail; reporting it here
+    # too counted one problem twice (CT-12, production scan 2026-10-29).
     return res
 
 

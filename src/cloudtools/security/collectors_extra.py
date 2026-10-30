@@ -27,6 +27,7 @@ PROBES = {
     "cloudtrail.write_events": ("cloudtrail", "lookup_events", {"MaxResults": 1}),
     "route53.records": ("route53", "list_hosted_zones", {"MaxItems": "1"}),
     "cloudfront.distributions": ("cloudfront", "list_distributions", {"MaxItems": "1"}),
+    "amplify.domains": ("amplify", "list_apps", {"maxResults": 1}),
     "accessanalyzer.findings": ("accessanalyzer", "list_analyzers", {"maxResults": 1}),
     "kms.key_rotation": ("kms", "list_keys", {"Limit": 1}),
     "cloudtrail.trail_integrity": ("cloudtrail", "describe_trails", {}),
@@ -289,6 +290,24 @@ def route53_records(env, region):
     return {"zones": sorted(zones, key=lambda z: z["id"]),
             "records": sorted(records, key=lambda r: (r["zone"], r["name"], r["type"])),
             "bucket_exists": exists}
+
+
+# ---------------------------------------------------------------- Amplify Hosting
+@collector("amplify.domains", ["amplify:ListApps", "amplify:ListDomainAssociations"])
+def amplify_domains(env, region):
+    """Custom domains of Amplify Hosting apps, and the CloudFront names they're served from.
+    Those distributions are in AWS's own account, so without this every Amplify site looked
+    like a record pointing at someone else's distribution (CT-13: 8 company domains in the
+    production scan of 2026-10-29). ACM validation records are not targets."""
+    amp = env.client("amplify", region)
+    out = []
+    for app in _pages(amp, "list_apps", "apps"):
+        for d in _pages(amp, "list_domain_associations", "domainAssociations", appId=app["appId"]):
+            targets = {t.rstrip(".").lower() for sd in d.get("subDomains", [])
+                       for t in str(sd.get("dnsRecord", "")).split()}
+            out.append({"app_id": app["appId"], "domain": d.get("domainName", ""),
+                        "targets": sorted(t for t in targets if t.endswith(".cloudfront.net"))})
+    return sorted(out, key=lambda a: (a["app_id"], a["domain"]))
 
 
 # ---------------------------------------------------------------- CloudFront (global)

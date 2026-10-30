@@ -12,8 +12,10 @@ def test_no_text_io_without_explicit_encoding():
     bad = []
     for f in SRC.rglob("*.py"):
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            # (a urllib opener's .open() returns bytes: there is no encoding to give)
             if re.search(r"\.(read_text|write_text)\(|\bopen\(|fdopen\(", line) \
                     and "encoding=" not in line and "os.open(" not in line and "_bytes" not in line \
+                    and "opener.open(" not in line \
                     and not re.search(r"""["'][rwa]b\+?["']""", line):        # binary mode
                 bad.append(f"{f.relative_to(SRC)}:{n}: {line.strip()}")
     assert not bad, "text I/O without encoding= (breaks on Windows):\n" + "\n".join(bad)

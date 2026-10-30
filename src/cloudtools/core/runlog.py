@@ -4,6 +4,7 @@ safety net (R10.1); request and response bodies are never passed in."""
 from __future__ import annotations
 
 import json
+import os
 import threading
 import re
 import sys
@@ -34,7 +35,9 @@ Sink = Callable[[dict], None]
 
 def file_sink(path) -> Sink:
     def write(event: dict) -> None:
-        with open(path, "a", encoding="utf-8") as f:
+        # 0600 like every other output (CT-20): the log names the caller and every call.
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             f.write(redact(json.dumps(event, default=str)) + "\n")
     return write
 

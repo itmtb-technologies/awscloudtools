@@ -2,6 +2,7 @@
 no hosted service contacted or configured."""
 from __future__ import annotations
 
+import json
 import os
 import secrets
 import tempfile
@@ -11,7 +12,7 @@ from pathlib import Path
 
 from ..aws import AwsEnv
 from ..capability import Manifest
-from ..runlog import file_sink, stderr_sink
+from ..runlog import file_sink, redact, stderr_sink
 from .base import Principal, Refused
 
 
@@ -72,34 +73,57 @@ class LocalStore:
 class S3Store:
     """R2.2: output to the user's own bucket. Writes go through a plain boto3 client
     built here, never through AwsEnv (whose clients are read-only by construction): the
-    destination is the user's chosen output, not the scanned account's resources."""
+    destination is the user's chosen output, not the scanned account's resources.
+
+    Every call names the bucket's owner (CT-19, review 2026-10-30), so AWS refuses a
+    bucket in any other account: a typo, or a name someone else registered, would
+    otherwise receive the full report. The owner is the caller's account, or
+    CLOUDTOOLS_S3_BUCKET_OWNER for a central bucket in another account."""
 
     def __init__(self, uri: str, profile: str | None = None):
         import boto3
         bucket, _, prefix = uri[len("s3://"):].partition("/")
         self.bucket, self.prefix = bucket, prefix.rstrip("/")
-        self._s3 = boto3.Session(profile_name=profile).client("s3")
+        session = boto3.Session(profile_name=profile)
+        self._s3 = session.client("s3")
+        self.owner = (os.environ.get("CLOUDTOOLS_S3_BUCKET_OWNER")
+                      or session.client("sts").get_caller_identity()["Account"])
 
     def _k(self, key: str) -> str:
         return f"{self.prefix}/{key}" if self.prefix else key
 
     def put(self, key: str, data: bytes, content_type: str = "application/json") -> str:
         self._s3.put_object(Bucket=self.bucket, Key=self._k(key), Body=data,
-                            ContentType=content_type, ServerSideEncryption="AES256")
+                            ContentType=content_type, ServerSideEncryption="AES256",
+                            ExpectedBucketOwner=self.owner)
         return f"s3://{self.bucket}/{self._k(key)}"
 
     def get(self, key: str) -> bytes | None:
         try:
-            return self._s3.get_object(Bucket=self.bucket, Key=self._k(key))["Body"].read()
+            return self._s3.get_object(Bucket=self.bucket, Key=self._k(key),
+                                       ExpectedBucketOwner=self.owner)["Body"].read()
         except self._s3.exceptions.NoSuchKey:
             return None
 
     def list(self, prefix: str) -> list[str]:
         out, cut = [], len(self.prefix) + 1 if self.prefix else 0
         for page in self._s3.get_paginator("list_objects_v2").paginate(
-                Bucket=self.bucket, Prefix=self._k(prefix)):
+                Bucket=self.bucket, Prefix=self._k(prefix), ExpectedBucketOwner=self.owner):
             out += [o["Key"][cut:] for o in page.get("Contents", [])]
         return sorted(out)
+
+
+def _store_sink(store, key: str, every: int = 200):
+    """The run log for an output with no local folder (S3): kept in memory and written whole
+    at run.end, and every `every` events so a crash still leaves most of it (CT-10: 0.1.4
+    kept no run log at all for s3:// output)."""
+    lines: list[str] = []
+
+    def write(event: dict) -> None:
+        lines.append(redact(json.dumps(event, default=str)))
+        if event.get("event") == "run.end" or len(lines) % every == 0:
+            store.put(key, ("\n".join(lines) + "\n").encode(), "application/x-ndjson")
+    return write
 
 
 class StandalonePlatform:
@@ -172,6 +196,8 @@ class StandalonePlatform:
             path = self._store.root / "runs" / run_id / "run.jsonl"
             path.parent.mkdir(parents=True, exist_ok=True)
             sinks.append(file_sink(path))
+        else:
+            sinks.append(_store_sink(self._store, f"runs/{run_id}/run.jsonl"))
         if self.log_to_stderr:
             sinks.append(stderr_sink)
         return sinks

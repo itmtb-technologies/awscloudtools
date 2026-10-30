@@ -384,3 +384,91 @@ def test_guard_refuses_reads_that_mint_or_read_data(service, op):
     """The prefix allowlist let these through (review 2026-10-30). No collector calls one;
     the guard is what stops a future one."""
     assert is_read_only(op, service, tier=2) is False
+
+
+def test_terminal_output_carries_no_control_characters():
+    """CT-17: names come from the scanned account (an EC2 Name tag, ...) and reach the
+    terminal in finding titles; 0.1.4 printed an escape sequence in one unchanged."""
+    from cloudtools.core import publish
+    nasty = "evil\x1b]0;pwned\x07\x1b[2J\x9b31m\r"
+    f = {"id": "x", "severity": {"base": "low", "contextual": "low"}, "status": "open",
+         "check_id": "srv.public-ip", "diff": "new", "title": f"{nasty} has public IP 1.2.3.4",
+         "resource": {"id": "i-1", "name": nasty}, "remediation": {}}
+    rep = {"summary": {"by_severity": {k: 0 for k in ("critical", "high", "medium", "low", "info")},
+                       "open": 1, "accepted": 0, "gaps": 0, "diff": {"new": 1, "regressed": 0}},
+           "run": {"account": "123456789012", "regions": ["eu-west-1"], "run_id": "r-x"},
+           "chokepoints": [{"headline": nasty, "fix": nasty}], "paths": [{}], "findings": [f], "gaps": []}
+    out = publish.terminal(rep)
+    bad = [c for c in out if (ord(c) < 32 and c != "\n") or 127 <= ord(c) < 160]
+    assert not bad, [hex(ord(c)) for c in bad]
+    assert "evil" in out and "has public IP" in out
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX modes")
+def test_run_log_is_private_like_every_other_output(tmp_path):
+    """CT-20: run.jsonl was created 0644 (umask) while the store writes 0600."""
+    import os, stat
+    from cloudtools.core.runlog import RunLog, file_sink
+    old = os.umask(0o022)
+    try:
+        RunLog("r-x", [file_sink(tmp_path / "run.jsonl")]).emit("run.start")
+    finally:
+        os.umask(old)
+    assert stat.S_IMODE((tmp_path / "run.jsonl").stat().st_mode) == 0o600
+
+
+def test_guard_allows_only_operations_some_check_declares(monkeypatch):
+    """CT-6: 0.1.4 allowed any Describe/List/Get/... name not on a deny list. Now an
+    operation must also be one a collector declares (or a named extra the scanner itself
+    needs). dynamodb:ListTables is read-only but no check reads DynamoDB."""
+    import cloudtools.security.scan  # noqa: F401  (registers the collectors)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-west-1")
+    with mock_aws():
+        env = AwsEnv(region="eu-west-1")
+        with pytest.raises(WriteRefused, match="no check declares"):
+            env.client("dynamodb").list_tables()
+        env.client("ec2").describe_security_groups()          # declared: fine
+        env.client("sts").get_caller_identity()               # the scanner's own: fine
+
+
+@pytest.mark.parametrize("override", [None, "999988887777"])
+def test_s3_output_names_the_bucket_owner_on_every_call(monkeypatch, override):
+    """CT-19: a mistyped or sniped bucket in another account that allows writes would have
+    received full reports. Every S3 call now says whose bucket it must be (the caller's
+    account, or CLOUDTOOLS_S3_BUCKET_OWNER for a central bucket), so AWS refuses any other.
+    moto doesn't enforce the parameter, so the test checks it is sent."""
+    from cloudtools.core.platform.standalone import S3Store
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    if override:
+        monkeypatch.setenv("CLOUDTOOLS_S3_BUCKET_OWNER", override)
+    with mock_aws():
+        boto3.client("s3").create_bucket(Bucket="reports-bucket")
+        store = S3Store("s3://reports-bucket/cloudtools")
+        sent = []
+        store._s3.meta.events.register("before-parameter-build.s3.*",
+                                       lambda params, model, **_: sent.append((model.name, params.get("ExpectedBucketOwner"))))
+        store.put("runs/r-1/report.json", b"{}")
+        assert store.get("runs/r-1/report.json") == b"{}"
+        assert store.list("runs/") == ["runs/r-1/report.json"]
+    want = override or "123456789012"
+    assert sent and all(owner == want for _, owner in sent), sent
+
+
+def test_s3_output_keeps_the_run_log(monkeypatch):
+    """CT-10: with --out s3://... no run log was kept anywhere (only a local folder got a
+    file sink), so a scan written to S3 left no record of its calls."""
+    from cloudtools.core.platform.standalone import StandalonePlatform
+    from cloudtools.core.runlog import RunLog
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    with mock_aws():
+        s3 = boto3.client("s3")
+        s3.create_bucket(Bucket="reports-bucket")
+        plat = StandalonePlatform(output="s3://reports-bucket/ct")
+        log = RunLog("r-1", plat.log_sinks("r-1"))
+        log.emit("run.start", caller="arn:aws:iam::123456789012:user/x")
+        log.emit("api.call", service="ec2", action="DescribeRegions", token="abc123secret")
+        log.emit("run.end", exit_code=0)
+        body = s3.get_object(Bucket="reports-bucket", Key="ct/runs/r-1/run.jsonl")["Body"].read().decode()
+    lines = [json.loads(x) for x in body.splitlines()]
+    assert [x["event"] for x in lines] == ["run.start", "api.call", "run.end"]
+    assert "abc123secret" not in body                       # redacted like the file log

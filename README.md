@@ -22,7 +22,7 @@ that refuses anything except reads, and it never reads data or secret values.
 Needs Python 3.11 or newer and AWS credentials (a profile, SSO, or environment variables).
 
 ```bash
-pipx install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.4"
+pipx install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.5"
 cloudtools --version
 ```
 
@@ -30,7 +30,7 @@ No pipx? A venv does the same:
 
 ```bash
 python3 -m venv ~/.cloudtools
-~/.cloudtools/bin/pip install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.4"
+~/.cloudtools/bin/pip install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.5"
 ```
 
 From a clone (to change the code): `pip install .` in a venv, or `pip install '.[dev]'` for the tests.
@@ -104,7 +104,8 @@ cloudtools serve              # the same capabilities as a local HTTP API (needs
 `cloudtools serve` prints a token at start. Send it on every request, as
 `Authorization: Bearer <token>`, to `http://127.0.0.1:8765` or `http://localhost:8765`; it
 answers nothing else, so a web page you visit can't use it. Set `CLOUDTOOLS_SERVE_TOKEN` to
-choose the token yourself.
+choose the token yourself. Every request, allowed or refused, is recorded (method, path,
+status; never the token or query string) in `runs/http/run.jsonl` under the output folder.
 
 Common options:
 
@@ -114,7 +115,7 @@ Common options:
 | `--region R` | home region for global services (default: the profile's) |
 | `--regions a,b` | regions to scan (default: all enabled) |
 | `--profile quick\|full\|ci\|file.yaml` | which checks and outputs (default `quick`) |
-| `--out DIR` or `s3://bucket/prefix` | where reports go (default `./reports`) |
+| `--out DIR` or `s3://bucket/prefix` | where reports go (default `./reports`). For S3 the bucket must be in your own account; for a central bucket in another account set `CLOUDTOOLS_S3_BUCKET_OWNER=<account id>` |
 | `--tier 0\|1\|2` | how deep it looks (default 0; see Tiers) |
 | `--repo PATH` | also scan this git repo for secrets; repeat for more repos (needs gitleaks) |
 | `-q` / `-v` | quiet / stream the run log to stderr |

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cloudtools"
-version = "0.1.4"
+version = "0.1.5"
 description = "Read-only AWS security, credential and cost tools; one codebase, standalone or hosted"
 requires-python = ">=3.11"
 license = {text = "Apache-2.0"}
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-serve = ["fastapi>=0.115,<1", "uvicorn>=0.29,<1"]
+serve = ["fastapi>=0.115,<1", "starlette>=1.3.1,<2", "uvicorn>=0.29,<1"]
 dev = ["setuptools>=70.1", "pytest>=8,<10", "moto[all]>=5,<6", "httpx>=0.27,<1"]
 
 [project.scripts]

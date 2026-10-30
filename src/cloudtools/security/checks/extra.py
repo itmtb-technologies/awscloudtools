@@ -286,7 +286,7 @@ def activity_unused_regions(ctx) -> CheckResult:
 # ---------------------------------------------------------------- 6. dangling DNS
 @check(CheckSpec(
     "net.dangling-dns", "DNS record points at a resource that is not yours", "network", "high",
-    ("route53.records", "cloudfront.distributions", "s3.buckets"),
+    ("route53.records", "cloudfront.distributions", "s3.buckets", "amplify.domains"),
     covers="CNAME and alias records in public Route 53 zones pointing at an S3 endpoint whose "
            "bucket no account holds (anyone can create it: subdomain takeover) or that another "
            "account holds, and at a CloudFront distribution not in this account. Emits "
@@ -295,7 +295,8 @@ def activity_unused_regions(ctx) -> CheckResult:
                    "needs AWS's published ranges, which a read-only API scan does not fetch); "
                    "DNS hosted outside Route 53; Elastic Beanstalk, Azure or Heroku targets.",
     false_positives="A bucket or distribution in another account of yours (S3 does not reveal "
-                    "a bucket's owner): delete the finding's cause or accept the risk."))
+                    "a bucket's owner): delete the finding's cause or accept the risk. Amplify "
+                    "Hosting's distributions count as yours when amplify:ListApps is granted."))
 def dangling_dns(ctx) -> CheckResult:
     res = CheckResult(gaps=ctx.gaps())
     p = ctx.glob("route53.records")
@@ -304,6 +305,9 @@ def dangling_dns(ctx) -> CheckResult:
     dists = ctx.glob("cloudfront.distributions")
     s3 = ctx.glob("s3.buckets")
     mine_cf = {d["domain"].rstrip(".").lower() for d in dists or []}
+    # Amplify Hosting serves from distributions in AWS's account, listed per app (CT-13).
+    mine_cf |= {t for apps in (ctx.per_region("amplify.domains") or {}).values()
+                for a in apps or [] for t in a.get("targets", [])}
     mine_s3 = {b["name"] for b in (s3 or {}).get("buckets", [])}
     for r in p["records"]:
         name = r["name"].rstrip(".").lower()
@@ -546,8 +550,7 @@ def kms_rotation(ctx) -> CheckResult:
            "whose S3 bucket is public by policy or ACL.",
     does_not_cover="Buckets in another account, e.g. an organization's log archive (a gap); "
                    "object lock, MFA delete and bucket access logging.",
-    false_positives="None known for validation. log.cloudtrail-not-multiregion also reports "
-                    "validation off on multi-region trails (low); the two share the cause."))
+    false_positives="None known for validation."))
 def cloudtrail_integrity(ctx) -> CheckResult:
     res = CheckResult(gaps=ctx.gaps())
     trails, s3 = ctx.glob("cloudtrail.trail_integrity"), ctx.glob("s3.buckets")

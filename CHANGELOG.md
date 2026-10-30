@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.1.5 (2026-10-30)
+
+### Security (detailed review 2026-10-30)
+- **A scanned repo could hide its own secrets.** gitleaks obeyed a `.gitleaks.toml`,
+  `.gitleaksignore` or `gitleaks:allow` comment inside the repo (a committed allowlist turned
+  1 found secret into 0). The repo scan now uses gitleaks' default rules, ignores the repo's
+  own suppressions, reads history from a mirror clone, and reports any suppression it found
+  as an info finding.
+- **No secret value touches disk during a repo scan.** gitleaks' report now comes back on
+  stdout instead of a temp file.
+- **The read-only guard allows only operations a check declares.** A read-looking name is no
+  longer enough; an undeclared call is refused before it leaves the process.
+- **Terminal output strips control characters**, so a resource name from the scanned account
+  can't drive your terminal.
+- **S3 output names the bucket owner on every call**: your own account, or
+  `CLOUDTOOLS_S3_BUCKET_OWNER`. A mistyped or someone else's bucket is refused by AWS.
+- **`run.jsonl` is created 0600** like every other output.
+- **The `serve` extra requires `starlette>=1.3.1`** (older versions have published advisories;
+  none affected the features cloudtools uses).
+- **CI runs only pinned code:** actions by commit, gitleaks by checksum.
+
+### Fixed
+- **No run log was kept for `s3://` output.** It is now written to the bucket with the report.
+- **`cloudtools serve` records every request**, allowed or refused, without the token.
+- **CloudTrail log validation was reported twice** (once per check); now once.
+- **Amplify-hosted domains were reported as dangling DNS.** Their CloudFront names are now
+  read from Amplify (`amplify:ListApps`, `amplify:ListDomainAssociations`).
+
 ## 0.1.4 (2026-10-30)
 
 ### Added

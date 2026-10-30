@@ -46,6 +46,25 @@ EXTRA_ALLOWED = frozenset({
     "GenerateCredentialReport",   # IAM: asks AWS to build the report; changes nothing
     "HeadBucket",
 })
+# The second gate (CT-6, review 2026-10-30): a read-looking name is not enough. The
+# operation must be one some collector declares (`collect.COLLECTORS`, by IAM action name),
+# or one of these, which the scanner itself calls or whose IAM name differs from the API's.
+# Found by recording every operation in the test suite and a live tier-0..2 sandbox scan.
+EXTRA_OPERATIONS = frozenset({
+    "GetCallerIdentity", "DescribeRegions",          # AwsEnv itself: who, which regions
+    "GetMacieSession", "DescribeHub",                # doctor: is Macie / Security Hub on
+    "GetRestApis", "GetApis",                        # IAM apigateway:GET
+    "ListBuckets", "HeadBucket",                     # IAM s3:ListAllMyBuckets, s3:ListBucket
+    "GetPublicAccessBlock",                          # IAM s3:Get{Bucket,Account}PublicAccessBlock
+})
+
+
+def declared_operations() -> frozenset:
+    from .collect import COLLECTORS                  # late: collect imports this module
+    return frozenset(a.split(":", 1)[1] for c in COLLECTORS.values() for a in c.actions) \
+        | EXTRA_OPERATIONS
+
+
 # STS AssumeRole is used only by the platform object (hosted / multi-account), never by a
 # collector, through `assume_role_env` below, which builds its own client.
 
@@ -152,6 +171,9 @@ class AwsEnv:
         if not is_read_only(model.name, model.service_model.endpoint_prefix, tier, params):
             raise WriteRefused(f"{model.service_model.service_name}:{model.name} is not "
                                f"read-only at tier {tier} and is refused by cloudtools")
+        if model.name not in declared_operations():
+            raise WriteRefused(f"{model.service_model.service_name}:{model.name} is read-only "
+                               "but no check declares it, so cloudtools refuses it")
 
     def _guard_params(self, model, params, **_):
         """Before the request is built: the only hook that sees the caller's parameters

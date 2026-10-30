@@ -151,3 +151,62 @@ def test_repo_scan_skips_the_scanners_own_output(tmp_path):
     out = scan_repos([str(repo)], "s", exclude=[str(repo / "reports")])
     locs = [loc for s in out["repos"][0]["secrets"] for loc in s["locations"]]
     assert locs and not any("reports/" in loc for loc in locs)
+
+
+# -- CT-14/CT-15 (detailed sweep 2026-10-30) -------------------------------------------
+def _git(repo, *a):
+    return subprocess.run(["git", *a], cwd=repo, check=True, capture_output=True, text=True).stdout
+
+
+@needs_gitleaks
+def test_a_repo_cannot_hide_its_secrets_from_the_scan(tmp_path):
+    """CT-14: gitleaks obeys a .gitleaks.toml, a .gitleaksignore and `gitleaks:allow`
+    comments found in the scanned repo. On 0.1.4 a committed allowlist turned 1 hit into 0."""
+    repo = tmp_path / "sneaky"
+    repo.mkdir()
+    (repo / "config.py").write_text(f'GH = "{GH_TOKEN}"\n')
+    (repo / "other.py").write_text(f'GH2 = "{GH_TOKEN[:-4]}AAAA"  # gitleaks:allow\n')
+    _git(repo, "init", "-q")
+    _git(repo, "add", "-A")
+    _git(repo, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-qm", "add")
+    first = _git(repo, "rev-parse", "HEAD").strip()
+    (repo / ".gitleaks.toml").write_text("[allowlist]\ndescription = 'x'\npaths = ['''.*''']\n")
+    _git(repo, "add", "-A")
+    _git(repo, "-c", "user.email=t@example.com", "-c", "user.name=t", "commit", "-qm", "cfg")
+    (repo / ".gitleaksignore").write_text(f"{first}:config.py:github-pat:1\nconfig.py:github-pat:1\n")
+    out = scan_repo(str(repo), salt="s1")
+    rules = [s["rule"] for s in out["secrets"]]
+    assert rules.count("github-pat") == 2, out          # both tokens, allowlist or not
+    assert out["suppressions"] == {"files": [".gitleaks.toml", ".gitleaksignore"], "inline_allows": 1}
+
+
+@needs_gitleaks
+def test_repo_scan_writes_no_file_holding_a_secret(tmp_path, monkeypatch):
+    """CT-15: 0.1.4 had gitleaks write its JSON report, raw secrets included, to a temp file
+    (deleted afterwards, but left behind if the process is killed)."""
+    import tempfile
+    from cloudtools.creds import repo_secrets
+    tmp = tmp_path / "tmp"
+    tmp.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp))
+    leaked = []
+    real_run = subprocess.run
+
+    def watching(*a, **kw):
+        proc = real_run(*a, **kw)
+        for f in tmp.rglob("*"):                         # right after gitleaks returns
+            if f.is_file() and GH_TOKEN.encode() in f.read_bytes():
+                leaked.append(f.name)
+        return proc
+    monkeypatch.setattr(repo_secrets.subprocess, "run", watching)
+    repo = git_repo(tmp_path, {"config.py": f'GH = "{GH_TOKEN}"\n'})
+    assert scan_repo(str(repo), salt="s1")["secrets"]
+    assert not leaked, leaked
+
+
+def test_repo_suppressions_are_reported_not_obeyed():
+    r = run("cred.repo-secrets", snap(repo__secrets={"repos": [{
+        "repo": "sneaky", "path": "/r/sneaky", "secrets": [],
+        "suppressions": {"files": [".gitleaksignore"], "inline_allows": 2}}], "errors": []}))
+    [f] = r.findings
+    assert f.severity == "info" and "suppress" in f.title

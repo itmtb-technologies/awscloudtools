@@ -73,7 +73,16 @@ def to_sarif(report: dict, catalogue: list[dict]) -> bytes:
     return json.dumps(doc, indent=2).encode()
 
 
+# C0 and C1 control characters, DEL included. Names in a report come from the scanned
+# account, and an escape sequence in one would drive the reader's terminal (CT-17).
+_CONTROL = {c: None for c in [*range(0, 32), *range(127, 160)] if c != 10}
+
+
 def terminal(report: dict, top: int = 10) -> str:
+    return _terminal(report, top).translate(_CONTROL)
+
+
+def _terminal(report: dict, top: int) -> str:
     s = report["summary"]
     run = report["run"]
     lines = [f"cloudtools security · account {run['account']} · {len(run['regions'])} region(s) · "

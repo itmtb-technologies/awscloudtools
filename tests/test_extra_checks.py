@@ -465,3 +465,52 @@ def test_collectors_over_moto_feed_the_checks(monkeypatch):
     assert dns_.findings[0].severity == "high"
     assert [f.resource["name"] for f in run("log.kms-rotation-off", s).findings] == [sym]
     assert [f.qualifiers["aspect"] for f in run("log.cloudtrail-integrity", s).findings] == ["validation"]
+
+
+def test_validation_off_is_reported_once_not_twice():
+    """CT-12 (production scan 2026-10-29): one multi-region, logging trail without log file
+    validation came out under log.cloudtrail-not-multiregion AND log.cloudtrail-integrity."""
+    t = {"arn": "arn:aws:cloudtrail:eu-west-1:1:trail/t", "name": "t", "home": "eu-west-1",
+         "multi_region": True, "org": False, "logging": True, "status_denied": None,
+         "validation": False, "kms": False}
+    multi = run("log.cloudtrail-not-multiregion", snap(cloudtrail__trails=[t]))
+    assert not multi.findings, [f.title for f in multi.findings]
+
+
+# -- CT-13: Amplify-hosted domains (production scan 2026-10-29) -------------------------
+def test_dangling_dns_amplify_hosted_domain_is_yours():
+    """Amplify Hosting serves custom domains from CloudFront distributions in AWS's own
+    account, so 8 of the company's domains were reported as pointing at a foreign target."""
+    amp = test_checks_table.reg([{"app_id": "a1", "domain": "example.com",
+                                  "targets": ["d999.cloudfront.net"]}])
+    s = snap(route53__records=dns("d999.cloudfront.net"), cloudfront__distributions=distribution(),
+             s3__buckets=buckets(), amplify__domains=amp)
+    assert not run("net.dangling-dns", s).findings
+    other = snap(route53__records=dns("d777.cloudfront.net"), cloudfront__distributions=distribution(),
+                 s3__buckets=buckets(), amplify__domains=amp)
+    assert run("net.dangling-dns", other).findings          # a real stranger still shows
+
+
+def test_amplify_collector_reads_each_apps_cloudfront_names():
+    from cloudtools.security import collectors_extra as cx
+
+    class Amp:
+        def can_paginate(self, op):
+            return False
+
+        def list_apps(self, **kw):
+            return {"apps": [{"appId": "a1"}]}
+
+        def list_domain_associations(self, appId, **kw):
+            assert appId == "a1"
+            return {"domainAssociations": [{"domainName": "example.com", "subDomains": [
+                {"dnsRecord": "www CNAME d999.cloudfront.net"},
+                {"dnsRecord": " CNAME D999.cloudfront.net."},
+                {"dnsRecord": "verify CNAME _abc.acm-validations.aws."}]}]}
+
+    class Env:
+        def client(self, svc, region=None):
+            assert svc == "amplify"
+            return Amp()
+    assert cx.amplify_domains(Env(), "eu-west-1") == [
+        {"app_id": "a1", "domain": "example.com", "targets": ["d999.cloudfront.net"]}]
