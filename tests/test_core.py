@@ -472,3 +472,85 @@ def test_s3_output_keeps_the_run_log(monkeypatch):
     lines = [json.loads(x) for x in body.splitlines()]
     assert [x["event"] for x in lines] == ["run.start", "api.call", "run.end"]
     assert "abc123secret" not in body                       # redacted like the file log
+
+
+# AssumeRole is made only by `aws.assume_role_session`, on its own client, never through an
+# AwsEnv: the guard refuses it on purpose.
+NOT_THROUGH_THE_GUARD = {("sts", "AssumeRole")}
+
+
+def test_every_operation_the_code_can_call_is_allowed():
+    """0.1.5 built its allowlist from the operations that RAN (tests + one sandbox scan) and
+    missed apigateway:GetResources, which only runs when an account has REST APIs: the first
+    production scan (2026-10-30) died on it. This reads every operation the collectors and
+    doctor can name, from the source, and checks each against the guard."""
+    import re
+    from pathlib import Path
+    import botocore.session
+    from cloudtools.core import aws
+    from cloudtools.security import doctor
+    import cloudtools.security.scan  # noqa: F401
+    import cloudtools.creds.collectors, cloudtools.creds.config_secrets  # noqa: F401,E401
+    src = Path(__file__).resolve().parents[1] / "src" / "cloudtools"
+    files = [*(src / "security").glob("collectors*.py"), src / "creds" / "collectors.py",
+             src / "creds" / "config_secrets.py", src / "security" / "doctor.py", src / "core" / "aws.py"]
+    text = "\n".join(f.read_text(encoding="utf-8") for f in files)
+    probes = dict(doctor.PROBES)
+    for mod in ("security.collectors_extra", "security.collectors_cve", "creds.collectors", "creds.config_secrets"):
+        probes.update(getattr(__import__(f"cloudtools.{mod}", fromlist=["x"]), "PROBES", {}))
+    services = set(re.findall(r'client\(\s*"([a-z0-9-]+)"', text)) | {s for s, _, _ in probes.values()}
+    called = (set(re.findall(r"\.([a-z][a-z0-9_]+)\(", text))
+              | set(re.findall(r'_pages\(\s*\w+,\s*"([a-z0-9_]+)"', text))
+              | set(re.findall(r'get_paginator\(\s*"([a-z0-9_]+)"', text))
+              | {op for _, op, _ in probes.values()})
+    sess, allowed, refused = botocore.session.get_session(), aws.declared_operations(), []
+    for svc in sorted(services):
+        for op in sess.get_service_model(svc).operation_names:
+            if botocore.xform_name(op) in called and op not in allowed \
+                    and (svc, op) not in NOT_THROUGH_THE_GUARD:
+                refused.append(f"{svc}:{op}")
+    assert len(services) > 30 and not refused, refused
+
+
+def test_an_undeclared_read_is_one_gap_not_a_dead_scan(monkeypatch):
+    """0.1.5: one undeclared read (apigateway:GetResources) killed the whole production scan.
+    The call must still be refused, but only its collector is lost, as a gap that says it is
+    a cloudtools bug; a real write still stops everything."""
+    from cloudtools.core import collect as C
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-west-1")
+    monkeypatch.setitem(C.COLLECTORS, "test.undeclared", C.CollectorSpec(
+        "test.undeclared", lambda env, r: env.client("dynamodb", r).list_tables(), "regional",
+        ("dynamodb:ListTablez",), False))
+    monkeypatch.setitem(C.COLLECTORS, "test.fine", C.CollectorSpec(
+        "test.fine", lambda env, r: env.client("ec2", r).describe_security_groups()["SecurityGroups"],
+        "regional", ("ec2:DescribeSecurityGroups",), False))
+    with mock_aws():
+        snap = C.collect(AwsEnv(region="eu-west-1"), ["test.undeclared", "test.fine"],
+                         ["eu-west-1"], "123456789012")
+    [miss] = snap.misses
+    assert miss.key == "test.undeclared" and "dynamodb:ListTables" in miss.why and "bug" in miss.why
+    assert snap.get("test.fine", "eu-west-1") is not None
+    monkeypatch.setitem(C.COLLECTORS, "test.write", C.CollectorSpec(
+        "test.write", lambda env, r: env.client("ec2", r).create_security_group(GroupName="x", Description="x"),
+        "regional", ("ec2:CreateSecurityGroup",), False))
+    with mock_aws(), pytest.raises(WriteRefused):
+        C.collect(AwsEnv(region="eu-west-1"), ["test.write"], ["eu-west-1"], "123456789012")
+
+
+def test_api_gateway_collector_runs_against_rest_and_http_apis(monkeypatch):
+    """The exact 0.1.5 failure: an account with a REST API (and an HTTP API), through the
+    real collector and guard."""
+    from cloudtools.core import collect as C
+    import cloudtools.security.scan  # noqa: F401
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "ap-south-1")
+    with mock_aws():
+        rest = boto3.client("apigateway", region_name="ap-south-1")
+        api = rest.create_rest_api(name="learn-rest")
+        root = rest.get_resources(restApiId=api["id"])["items"][0]["id"]
+        rest.put_method(restApiId=api["id"], resourceId=root, httpMethod="GET", authorizationType="NONE")
+        v2 = boto3.client("apigatewayv2", region_name="ap-south-1")
+        h = v2.create_api(Name="learn-http", ProtocolType="HTTP")
+        v2.create_route(ApiId=h["ApiId"], RouteKey="ANY /{proxy+}")
+        snap = C.collect(AwsEnv(region="ap-south-1"), ["apigw.apis"], ["ap-south-1"], "123456789012")
+    assert not snap.misses, snap.misses
+    assert snap.get("apigw.apis", "ap-south-1")

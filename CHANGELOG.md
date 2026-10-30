@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.6 (2026-10-30)
+
+### Fixed
+- **0.1.5 stopped with `WriteRefused: apigateway:GetResources` on any account with a REST
+  API.** The new operation allowlist was built from the operations that ran in tests and a
+  sandbox scan, and the sandbox had no REST or HTTP APIs. `GetResources`, `GetRoutes` and
+  `GetIntegrations` are now allowed, and a test reads every operation the code can call from
+  the source, not only the ones that ran.
+- **One undeclared read no longer ends the scan.** It is still refused, but it costs only the
+  collector that made it, reported as a gap that says it's a cloudtools bug. A write still
+  stops everything.
+
 ## 0.1.5 (2026-10-30)
 
 ### Security (detailed review 2026-10-30)

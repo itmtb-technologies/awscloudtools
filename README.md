@@ -22,7 +22,7 @@ that refuses anything except reads, and it never reads data or secret values.
 Needs Python 3.11 or newer and AWS credentials (a profile, SSO, or environment variables).
 
 ```bash
-pipx install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.5"
+pipx install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.6"
 cloudtools --version
 ```
 
@@ -30,7 +30,7 @@ No pipx? A venv does the same:
 
 ```bash
 python3 -m venv ~/.cloudtools
-~/.cloudtools/bin/pip install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.5"
+~/.cloudtools/bin/pip install "git+https://github.com/itmtb-technologies/awscloudtools.git@v0.1.6"
 ```
 
 From a clone (to change the code): `pip install .` in a venv, or `pip install '.[dev]'` for the tests.

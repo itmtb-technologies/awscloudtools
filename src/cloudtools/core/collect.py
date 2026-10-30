@@ -17,7 +17,7 @@ from typing import Callable
 
 from botocore.exceptions import ClientError
 
-from .aws import AwsEnv, WriteRefused, is_access_denied
+from .aws import AwsEnv, UndeclaredRead, WriteRefused, is_access_denied
 
 GLOBAL = "global"
 
@@ -90,8 +90,11 @@ class Snapshot:
 def _run_one(env: AwsEnv, spec: CollectorSpec, region: str):
     try:
         return spec.fn(env, region), None
+    except UndeclaredRead as e:                # refused, and a bug: one gap, not a dead scan
+        return None, Miss(spec.key, region, f"UndeclaredRead {e.operation}: a cloudtools bug, "
+                          "please report it", False, spec.actions)
     except WriteRefused:
-        raise                                  # a bug, never swallowed
+        raise                                  # a write: a bug, never swallowed
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code", "Error")
         return None, Miss(spec.key, region, code, is_access_denied(e), spec.actions)

@@ -49,11 +49,15 @@ EXTRA_ALLOWED = frozenset({
 # The second gate (CT-6, review 2026-10-30): a read-looking name is not enough. The
 # operation must be one some collector declares (`collect.COLLECTORS`, by IAM action name),
 # or one of these, which the scanner itself calls or whose IAM name differs from the API's.
-# Found by recording every operation in the test suite and a live tier-0..2 sandbox scan.
+# Checked against every operation the collectors and doctor can name (a test).
 EXTRA_OPERATIONS = frozenset({
     "GetCallerIdentity", "DescribeRegions",          # AwsEnv itself: who, which regions
     "GetMacieSession", "DescribeHub",                # doctor: is Macie / Security Hub on
-    "GetRestApis", "GetApis",                        # IAM apigateway:GET
+    # IAM apigateway:GET. GetResources, GetRoutes and GetIntegrations run only when an
+    # account has REST or HTTP APIs, so 0.1.5's recording (whose sandbox had none) missed
+    # them and the first production scan died (2026-10-30). tests/test_core.py now reads
+    # every operation the code can call from the source, not only the ones that ran.
+    "GetRestApis", "GetResources", "GetApis", "GetRoutes", "GetIntegrations",
     "ListBuckets", "HeadBucket",                     # IAM s3:ListAllMyBuckets, s3:ListBucket
     "GetPublicAccessBlock",                          # IAM s3:Get{Bucket,Account}PublicAccessBlock
 })
@@ -77,6 +81,17 @@ class AwsAccessError(RuntimeError):
 
 class WriteRefused(RuntimeError):
     """A non-read-only AWS operation was attempted. This is a bug, never a fallback."""
+
+
+class UndeclaredRead(WriteRefused):
+    """A read no check declares. Still refused, and still a bug, but it costs only the
+    collector that made it (a gap), not the whole scan: 0.1.5's first production run died on
+    one (apigateway:GetResources, 2026-10-30). A true write stays WriteRefused and stops all."""
+
+    def __init__(self, operation: str):
+        super().__init__(f"{operation} is read-only but no check declares it, so cloudtools "
+                         "refuses it")
+        self.operation = operation
 
 
 # Reads that are refused for one service only, where the same name elsewhere is fine
@@ -172,8 +187,7 @@ class AwsEnv:
             raise WriteRefused(f"{model.service_model.service_name}:{model.name} is not "
                                f"read-only at tier {tier} and is refused by cloudtools")
         if model.name not in declared_operations():
-            raise WriteRefused(f"{model.service_model.service_name}:{model.name} is read-only "
-                               "but no check declares it, so cloudtools refuses it")
+            raise UndeclaredRead(f"{model.service_model.service_name}:{model.name}")
 
     def _guard_params(self, model, params, **_):
         """Before the request is built: the only hook that sees the caller's parameters
